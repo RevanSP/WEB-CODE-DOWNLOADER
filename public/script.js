@@ -7,7 +7,7 @@ const fetchFiles = () => {
     const urlInput = document.getElementById('urlInput').value.trim();
 
     if (!urlInput) {
-        alert('Error: Please enter a URL');
+        showToast('Error: Please enter a URL', 'error');
         return;
     }
 
@@ -19,12 +19,20 @@ const fetchFiles = () => {
     try {
         url = new URL(urlInput);
     } catch (e) {
-        alert('Error: Invalid URL');
+        showToast('Error: Invalid URL', 'error');
         return;
     }
 
+    document.getElementById('downloadBtn').disabled = true;
+    document.getElementById('downloadBtn').classList.add('btn-disabled');
+
     fetch(url)
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.text();
+        })
         .then(html => {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
@@ -34,15 +42,19 @@ const fetchFiles = () => {
             });
 
             fetchAllCSS(doc, url);
-
             fetchAllJS(doc, url);
-
             fetchAllAssets(doc, url);
+
+            document.getElementById('downloadBtn').disabled = false;
+            document.getElementById('downloadBtn').classList.remove('btn-disabled');
         })
         .catch(_error => {
-            alert('Error: Error fetching the URL');
+            showToast('Error : Failed to fetch the URL', 'error');
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('downloadBtn').classList.add('btn-disabled');
         });
 };
+
 
 const fetchAllCSS = (doc, url) => {
     const cssPromises = [];
@@ -143,10 +155,39 @@ const downloadZIP = () => {
     jsFiles.forEach(file => zip.file(file.name, file.content));
     assetFiles.forEach(asset => zip.file(asset.name, asset.blob));
 
-    zip.generateAsync({
-        type: "blob"
-    })
+    zip.generateAsync({ type: "blob" })
         .then(content => {
             saveAs(content, "web_code.zip");
+            showToast('Download successful ! ZIP file created.', 'success');
+        })
+        .catch(() => {
+            showToast('Error : Failed to create ZIP file', 'error');
         });
+};
+
+const showToast = (message, type) => {
+    const toast = document.createElement('div');
+    toast.classList.add(
+        'alert', 
+        'alert-' + (type === 'success' ? 'success' : 'error'), 
+        'w-full', 
+        'mb-4', 
+        'transition-opacity',  
+        'duration-1000',  
+        'opacity-100'    
+    );
+    toast.innerHTML = `
+        <span>${message}</span>
+    `;
+
+    const toastContainer = document.getElementById('toast-container');
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('opacity-0');
+    }, 3000); 
+
+    setTimeout(() => {
+        toast.remove();
+    }, 4000); 
 };
